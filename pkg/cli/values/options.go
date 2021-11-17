@@ -34,6 +34,7 @@ type Options struct {
 	StringValues []string
 	Values       []string
 	FileValues   []string
+	YamlStrings	 []string
 }
 
 // MergeValues merges values from files specified via -f/--values and directly
@@ -52,6 +53,16 @@ func (opts *Options) MergeValues(p getter.Providers) (map[string]interface{}, er
 
 		if err := yaml.Unmarshal(bytes, &currentMap); err != nil {
 			return nil, errors.Wrapf(err, "failed to parse %s", filePath)
+		}
+		// Merge with the previous map
+		base = mergeMaps(base, currentMap)
+	}
+
+	// hyperkuber, specified via --set-yaml-string
+	for _, value := range opts.YamlStrings {
+		currentMap := map[string]interface{}{}
+		if err := yaml.Unmarshal([]byte(value), &currentMap); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse --set-yaml-string")
 		}
 		// Merge with the previous map
 		base = mergeMaps(base, currentMap)

@@ -58,6 +58,8 @@ type EnvSettings struct {
 	KubeCaFile string
 	// Debug indicates whether or not Helm is running in Debug mode.
 	Debug bool
+	// skip kubenetes api server cert verify
+	KubeSkipTlsVerify bool
 	// RegistryConfig is the path to the registry config file.
 	RegistryConfig string
 	// RepositoryConfig is the path to the repositories file.
@@ -80,6 +82,7 @@ func New() *EnvSettings {
 		KubeAsGroups:     envCSV("HELM_KUBEASGROUPS"),
 		KubeAPIServer:    os.Getenv("HELM_KUBEAPISERVER"),
 		KubeCaFile:       os.Getenv("HELM_KUBECAFILE"),
+		KubeSkipTlsVerify: envBoolOr("HELM_KUBEINSECURE", false),
 		PluginsDirectory: envOr("HELM_PLUGINS", helmpath.DataPath("plugins")),
 		RegistryConfig:   envOr("HELM_REGISTRY_CONFIG", helmpath.ConfigPath("registry.json")),
 		RepositoryConfig: envOr("HELM_REPOSITORY_CONFIG", helmpath.ConfigPath("repositories.yaml")),
@@ -97,6 +100,7 @@ func New() *EnvSettings {
 		KubeConfig:       &env.KubeConfig,
 		Impersonate:      &env.KubeAsUser,
 		ImpersonateGroup: &env.KubeAsGroups,
+		Insecure:         &env.KubeSkipTlsVerify,
 	}
 	return env
 }
@@ -112,6 +116,7 @@ func (s *EnvSettings) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.KubeAPIServer, "kube-apiserver", s.KubeAPIServer, "the address and the port for the Kubernetes API server")
 	fs.StringVar(&s.KubeCaFile, "kube-ca-file", s.KubeCaFile, "the certificate authority file for the Kubernetes API server connection")
 	fs.BoolVar(&s.Debug, "debug", s.Debug, "enable verbose output")
+	fs.BoolVar(&s.KubeSkipTlsVerify, "kube-skip-tls-verify", s.KubeSkipTlsVerify, "skip kubernetes api server cert verification")
 	fs.StringVar(&s.RegistryConfig, "registry-config", s.RegistryConfig, "path to the registry config file")
 	fs.StringVar(&s.RepositoryConfig, "repository-config", s.RepositoryConfig, "path to the file containing repository names and URLs")
 	fs.StringVar(&s.RepositoryCache, "repository-cache", s.RepositoryCache, "path to the file containing cached repository indexes")
@@ -134,6 +139,18 @@ func envIntOr(name string, def int) int {
 		return def
 	}
 	return ret
+}
+
+func envBoolOr(name string, def bool) bool {
+	v, ok := os.LookupEnv(name)
+	if ok {
+		value, err := strconv.ParseBool(v)
+		if err != nil {
+			return def
+		}
+		return value
+	}
+	return def
 }
 
 func envCSV(name string) (ls []string) {
@@ -165,6 +182,7 @@ func (s *EnvSettings) EnvVars() map[string]string {
 		"HELM_KUBEASGROUPS":  strings.Join(s.KubeAsGroups, ","),
 		"HELM_KUBEAPISERVER": s.KubeAPIServer,
 		"HELM_KUBECAFILE":    s.KubeCaFile,
+		"HELM_KUBEINSECURE":    fmt.Sprint(s.KubeSkipTlsVerify),
 	}
 	if s.KubeConfig != "" {
 		envvars["KUBECONFIG"] = s.KubeConfig
